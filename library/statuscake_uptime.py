@@ -24,8 +24,6 @@ module: statuscake_uptime
 short_description: Manage StatusCake uptime tests
 description:
     - Manage StatusCake uptime tests by using StatusCake REST API.
-requirements:
-  - "requests >= 2.18.0"
 version_added: "2.2"
 author: "Raphael Pereira Ribeiro (@raphapr)"
 options:
