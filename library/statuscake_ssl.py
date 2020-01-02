@@ -24,8 +24,6 @@ module: statuscake_ssl
 short_description: Manage StatusCake SSL tests
 description:
     - Manage StatusCake SSL tests by using StatusCake REST API.
-requirements:
-  - "requests >= 2.18.0"
 version_added: "2.2"
 author: "Raphael Pereira Ribeiro (@raphapr)"
 options:
@@ -100,8 +98,10 @@ EXAMPLES = '''
     alert_mixed: true
 '''
 
-import requests
 from ansible.module_utils.basic import *
+from ansible.module_utils.urls import fetch_url, open_url
+from ansible.module_utils._text import to_native
+from ansible.module_utils.six.moves.urllib.parse import urlencode
 
 
 class StatusCakeSSL:
@@ -145,7 +145,7 @@ class StatusCakeSSL:
         }
 
     def get_all_tests(self):
-        response = requests.get(self.URL_ALL_TESTS, headers=self.headers)
+        response = self.request(self.URL_ALL_TESTS)
         del self.result['domain']
         del self.result['state']
         self.result.update({'tests': {'output': response.json(),
@@ -154,13 +154,9 @@ class StatusCakeSSL:
     def check_response(self, response):
         if response.get('Success'):
             self.result['changed'] = True
-        elif response.get('Message') and not self.result.get('response'):
-            self.result['response'] = response['Message']
-        else:
-            self.module.fail_json(msg=response)
 
     def check_test(self):
-        response = requests.get(self.URL_ALL_TESTS, headers=self.headers)
+        response = self.request(self.URL_ALL_TESTS)
 
         for item in response.json():
             if item['domain'] == self.domain:
@@ -185,9 +181,9 @@ class StatusCakeSSL:
                 self.result['changed'] = True
                 self.result['response'] = ("Deletion successful")
             else:
-                response = requests.delete(self.URL_UPDATE_TEST + "?id=" +
-                                           str(test_id), headers=self.headers)
-                self.check_response(response.json())
+                response = self.delete(self.URL_UPDATE_TEST + "?id=" +
+                                       str(test_id))
+                self.check_response(response)
 
     def create_test(self):
         req_data = self.check_test()
@@ -197,11 +193,11 @@ class StatusCakeSSL:
                 self.result['changed'] = True
                 self.result['response'] = "SSL test inserted"
             else:
-                response = requests.put(self.URL_UPDATE_TEST,
-                                        headers=self.headers,
-                                        data=self.data)
+                response = self.request(self.URL_UPDATE_TEST,
+                                        method='PUT',
+                                        payload=urlencode(self.data))
                 self.result['response'] = "SSL test inserted"
-                self.check_response(response.json())
+                self.check_response(response)
         else:
             test_id = req_data['id']
             diffkeys = ([k for k in self.data if k in self.data.keys() and
@@ -224,16 +220,41 @@ class StatusCakeSSL:
                 else:
                     self.data.pop('domain')
                     self.data['id'] = test_id
-                    response = requests.put(self.URL_UPDATE_TEST,
-                                            headers=self.headers,
-                                            data=self.data)
-                    self.check_response(response.json())
+                    response = self.request(self.URL_UPDATE_TEST,
+                                            method='PUT',
+                                            payload=urlencode(self.data))
+                    self.check_response(response)
             self.result['diff']['before'] = {k: req_data[k] for k in diffkeys}
             self.result['diff']['after'] = {k: self.data[k] for k in diffkeys}
 
     def get_result(self):
         result = self.result
         return result
+
+    def request(self, url, method=None, payload=None):
+        """Generic HTTP method for StatusCake requests."""
+        self.url = url
+
+        if method is not None:
+            self.method = method
+        else:
+            self.method = 'GET'
+
+        resp, info = fetch_url(self.module, self.url,
+                               headers=self.headers,
+                               data=payload,
+                               method=self.method)
+
+        if info['status'] >= (500 or -1):
+            self.module.fail_json(msg='Request failed for {url}: {status} - {msg}'.format(**info))
+        elif info['status'] >= 300:
+            self.module.fail_json(msg='Request failed for {url}: {status} - {msg}'.format(**info),
+                                  body=self.module.jsonify((to_native(info['body']))))
+
+        try:
+            return self.module.from_json(to_native(resp.read()))
+        except AttributeError:
+            return self.module.from_json(to_native(info))
 
 
 def run_module():

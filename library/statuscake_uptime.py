@@ -24,8 +24,6 @@ module: statuscake_uptime
 short_description: Manage StatusCake uptime tests
 description:
     - Manage StatusCake uptime tests by using StatusCake REST API.
-requirements:
-  - "requests >= 2.18.0"
 version_added: "2.2"
 author: "Raphael Pereira Ribeiro (@raphapr)"
 options:
@@ -214,8 +212,10 @@ diff:
 
 '''
 
-import requests
 from ansible.module_utils.basic import *
+from ansible.module_utils.urls import fetch_url, open_url
+from ansible.module_utils._text import to_native
+from ansible.module_utils.six.moves.urllib.parse import urlencode
 
 
 class StatusCakeUptime:
@@ -227,7 +227,7 @@ class StatusCakeUptime:
                  test_tags, check_rate, test_type, port, contact_group, paused,
                  node_locations, confirmation, timeout, status_codes, host,
                  custom_header, follow_redirect, find_string, do_not_find,
-                 post_raw,trigger_rate):
+                 post_raw, trigger_rate):
 
         self.headers = {"Username": username, "API": api_key}
         self.module = module
@@ -301,30 +301,20 @@ class StatusCakeUptime:
         }
 
     def get_all_tests(self):
-        response = requests.get(self.URL_ALL_TESTS, headers=self.headers)
+        response = self.request(self.URL_ALL_TESTS)
         del self.result['name']
         del self.result['state']
-        self.result.update({'tests': {'output': response.json(),
-                            'count': len(response.json())}})
+        self.result.update({'tests': {'output': response,
+                            'count': len(response)}})
 
     def check_response(self, response):
         self.result['response'] = response['Message']
         if response['Success']:
             self.result['changed'] = True
-        elif not response['Message'].startswith('No data has been updated'):
-            errormsg = response['Message']
-
-            if response.get('Issues'):
-                errormsg += ' '
-                errormsg += ('; '.join("{0}: {1}".format(k, v)
-                             for k, v in response['Issues'].items()))
-
-            self.module.fail_json(msg=errormsg)
 
     def check_test(self):
-        response = requests.get(self.URL_ALL_TESTS, headers=self.headers)
-
-        for item in response.json():
+        response = self.request(self.URL_ALL_TESTS)
+        for item in response:
             if item['WebsiteName'] == self.name:
                 return item['TestID']
 
@@ -340,9 +330,10 @@ class StatusCakeUptime:
                 self.result['response'] = ("This Check Has Been Deleted. " +
                                            "It can not be recovered.")
             else:
-                response = requests.delete(self.URL_DETAILS_TEST,
-                                           headers=self.headers, data=data)
-                self.check_response(response.json())
+                response = self.request(self.URL_DETAILS_TEST,
+                                        method='DELETE',
+                                        payload=urlencode(self.data))
+                self.check_response(response)
 
     def create_test(self):
         test_id = self.check_test()
@@ -352,19 +343,20 @@ class StatusCakeUptime:
                 self.result['changed'] = True
                 self.result['response'] = "Test inserted"
             else:
-                response = requests.put(self.URL_UPDATE_TEST,
-                                        headers=self.headers,
-                                        data=self.data)
-                self.check_response(response.json())
+                response = self.request(self.URL_UPDATE_TEST,
+                                        method='PUT',
+                                        payload=urlencode(self.data))
+                self.check_response(response)
         else:
             self.data['TestID'] = test_id
             url_details_test = (self.URL_DETAILS_TEST +
                                 "/?TestID=" +
                                 str(test_id))
-            response = requests.get(url_details_test, headers=self.headers)
-            req_data = self.convert(response.json())
+            response = self.request(url_details_test)
+            req_data = self.convert(response)
             diffkeys = ([k for k in self.data if self.data[k] and
                         str(self.data[k]) != str(req_data[k])])
+
             if self.module.check_mode:
                 if len(diffkeys) != 0:
                     self.result['changed'] = True
@@ -374,12 +366,17 @@ class StatusCakeUptime:
                                                "(is any data different?) " +
                                                "Given: "+str(test_id))
             else:
-                response = requests.put(self.URL_UPDATE_TEST,
-                                        headers=self.headers,
-                                        data=self.data)
-                self.check_response(response.json())
+                response = self.request(self.URL_UPDATE_TEST,
+                                        method='PUT',
+                                        payload=urlencode(self.data))
+                self.check_response(response)
+
             self.result['diff']['before'] = {k: req_data[k] for k in diffkeys}
             self.result['diff']['after'] = {k: self.data[k] for k in diffkeys}
+
+    def get_result(self):
+        result = self.result
+        return result
 
     # convert data returned by request to a similar and comparable estruture
     def convert(self, req_data):
@@ -401,9 +398,30 @@ class StatusCakeUptime:
                 req_data[key] = 0
         return req_data
 
-    def get_result(self):
-        result = self.result
-        return result
+    def request(self, url, method=None, payload=None):
+        """Generic HTTP method for StatusCake requests."""
+        self.url = url
+
+        if method is not None:
+            self.method = method
+        else:
+            self.method = 'GET'
+
+        resp, info = fetch_url(self.module, self.url,
+                               headers=self.headers,
+                               data=payload,
+                               method=self.method)
+
+        if info['status'] >= (500 or -1):
+            self.module.fail_json(msg='Request failed for {url}: {status} - {msg}'.format(**info))
+        elif info['status'] >= 300:
+            self.module.fail_json(msg='Request failed for {url}: {status} - {msg}'.format(**info),
+                                  body=self.module.jsonify((to_native(info['body']))))
+
+        try:
+            return self.module.from_json(to_native(resp.read()))
+        except AttributeError:
+            return self.module.from_json(to_native(info))
 
 
 def run_module():
