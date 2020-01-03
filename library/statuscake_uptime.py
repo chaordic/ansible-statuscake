@@ -387,9 +387,9 @@ class StatusCakeUptime:
         req_data = ({k: req_data[k] for k in req_data.keys()
                     if k in self.data.keys()})
         for key in req_data.keys():
-            if type(req_data[key]) is list:
+            if isinstance(req_data[key],list):
                 req_data[key] = to_native(','.join(req_data[key]))
-            if type(req_data[key]) is unicode:
+            if isinstance(req_data[key],unicode):
                 req_data[key] = to_native(req_data[key])
             if req_data[key] is True:
                 req_data[key] = 1
