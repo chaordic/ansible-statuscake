@@ -158,7 +158,7 @@ class StatusCakeSSL:
     def check_test(self):
         response = self.request(self.URL_ALL_TESTS)
 
-        for item in response.json():
+        for item in response:
             if item['domain'] == self.domain:
                 return {"alert_at": item['alert_at'],
                         "alert_broken": item['alert_broken'],
