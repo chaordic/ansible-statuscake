@@ -409,7 +409,9 @@ class StatusCakeUptime:
         resp, info = fetch_url(self.module, self.url,
                                headers=self.headers,
                                data=payload,
-                               method=self.method)
+                               method=self.method,
+                               timeout=20
+                               )
 
         if info['status'] >= (500 or -1):
             self.module.fail_json(msg='Request failed for {url}: {status} - {msg}'.format(**info))
