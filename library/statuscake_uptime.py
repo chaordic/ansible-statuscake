@@ -221,7 +221,7 @@ from ansible.module_utils.six.moves.urllib.parse import urlencode
 class StatusCakeUptime:
     URL_UPDATE_TEST = "https://app.statuscake.com/API/Tests/Update"
     URL_ALL_TESTS = "https://app.statuscake.com/API/Tests"
-    URL_DETAILS_TEST = "https://app.statuscake.com/API/Tests/Details"
+    URL_DETAILS_TEST = "https://app.statuscake.com/API/Tests/Details/?TestID={test_id}"
 
     def __init__(self, module, username, api_key, name, url, state,
                  test_tags, check_rate, test_type, port, contact_group, paused,
@@ -324,15 +324,13 @@ class StatusCakeUptime:
         if not test_id:
             self.result['response'] = "This Check doesn't exists"
         else:
-            data = {'TestID': test_id}
             if self.module.check_mode:
                 self.result['changed'] = True
                 self.result['response'] = ("This Check Has Been Deleted. " +
                                            "It can not be recovered.")
             else:
-                response = self.request(self.URL_DETAILS_TEST,
-                                        method='DELETE',
-                                        payload=urlencode(self.data))
+                response = self.request(self.URL_DETAILS_TEST.format(test_id=test_id),
+                                        method='DELETE')
                 self.check_response(response)
 
     def create_test(self):
@@ -349,10 +347,7 @@ class StatusCakeUptime:
                 self.check_response(response)
         else:
             self.data['TestID'] = test_id
-            url_details_test = (self.URL_DETAILS_TEST +
-                                "/?TestID=" +
-                                str(test_id))
-            response = self.request(url_details_test)
+            response = self.request(self.URL_DETAILS_TEST.format(test_id=test_id))
             req_data = self.convert(response)
             diffkeys = ([k for k in self.data if self.data[k] and
                         str(self.data[k]) != str(req_data[k])])
