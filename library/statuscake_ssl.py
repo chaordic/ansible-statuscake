@@ -253,8 +253,8 @@ class StatusCakeSSL:
 
         try:
             return self.module.from_json(to_native(resp.read()))
-        except AttributeError:
-            return self.module.from_json(to_native(info))
+        except:
+            return self.module.fail_json(msg=info)
 
 
 def run_module():
