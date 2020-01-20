@@ -243,7 +243,9 @@ class StatusCakeSSL:
         resp, info = fetch_url(self.module, self.url,
                                headers=self.headers,
                                data=payload,
-                               method=self.method)
+                               method=self.method,
+                               timeout=20
+                               )
 
         if info['status'] >= (500 or -1):
             self.module.fail_json(msg='Request failed for {url}: {status} - {msg}'.format(**info))
@@ -253,8 +255,8 @@ class StatusCakeSSL:
 
         try:
             return self.module.from_json(to_native(resp.read()))
-        except AttributeError:
-            return self.module.from_json(to_native(info))
+        except:
+            return self.module.fail_json(msg=info)
 
 
 def run_module():
