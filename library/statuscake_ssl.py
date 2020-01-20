@@ -106,6 +106,7 @@ from ansible.module_utils.six.moves.urllib.parse import urlencode
 
 class StatusCakeSSL:
     URL_UPDATE_TEST = "https://app.statuscake.com/API/SSL/Update"
+    URL_DETAILS_TEST = "https://app.statuscake.com/API/SSL/Update?id={ssl_id}"
     URL_ALL_TESTS = "https://app.statuscake.com/API/SSL"
 
     def __init__(self, module, username, api_key, state, domain, checkrate,
@@ -181,8 +182,8 @@ class StatusCakeSSL:
                 self.result['changed'] = True
                 self.result['response'] = ("Deletion successful")
             else:
-                response = self.delete(self.URL_UPDATE_TEST + "?id=" +
-                                       str(test_id))
+                response = self.request(self.URL_DETAILS_TEST.format(ssl_id=test_id),
+                                        method='DELETE')
                 self.check_response(response)
 
     def create_test(self):
