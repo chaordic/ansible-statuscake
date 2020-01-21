@@ -307,7 +307,7 @@ def run_module():
     alert_reminder = module.params['alert_reminder']
     alert_broken = module.params['alert_broken']
     alert_mixed = module.params['alert_mixed']
-    statucake_timeout = module.params['statuscake_timeout']
+    statuscake_timeout = module.params['statuscake_timeout']
 
     if not (username and api_key) and \
             os.environ.get('STATUSCAKE_USERNAME') and \
