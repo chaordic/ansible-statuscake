@@ -80,6 +80,11 @@ options:
       - Set to true to enable mixed content warnings. False to disable
     default: true
     required: false
+  statuscake_timeout:
+    description:
+      - Specifies idle timeout (in seconds) for the connection. Yu may want to increase this in order to avoid timeout from StatusCake API.
+    default: true
+    required: false
 '''
 
 EXAMPLES = '''
@@ -111,7 +116,7 @@ class StatusCakeSSL:
 
     def __init__(self, module, username, api_key, state, domain, checkrate,
                  contact_group, alert_at, alert_expiry, alert_reminder,
-                 alert_broken, alert_mixed):
+                 alert_broken, alert_mixed, statuscake_timeout):
 
         self.headers = {"Username": username, "API": api_key}
         self.module = module
@@ -124,6 +129,12 @@ class StatusCakeSSL:
         self.alert_reminder = alert_reminder
         self.alert_broken = alert_broken
         self.alert_mixed = alert_mixed
+        self.statuscake_timeout = statuscake_timeout
+
+        if not statuscake_timeout:
+            self.statuscake_timeout = 10
+        else:
+            self.statuscake_timeout = statuscake_timeout
 
         self.data = {"domain": self.domain,
                      "checkrate": self.checkrate,
@@ -234,18 +245,17 @@ class StatusCakeSSL:
 
     def request(self, url, method=None, payload=None):
         """Generic HTTP method for StatusCake requests."""
-        self.url = url
 
         if method is not None:
             self.method = method
         else:
             self.method = 'GET'
 
-        resp, info = fetch_url(self.module, self.url,
+        resp, info = fetch_url(self.module, url,
                                headers=self.headers,
                                data=payload,
                                method=self.method,
-                               timeout=20
+                               timeout=self.statuscake_timeout
                                )
 
         if info['status'] >= (500 or -1):
@@ -273,7 +283,8 @@ def run_module():
         alert_expiry=dict(type='bool', required=False, default=True),
         alert_reminder=dict(type='bool', required=False, default=True),
         alert_broken=dict(type='bool', required=False, default=True),
-        alert_mixed=dict(type='bool', required=False, default=True)
+        alert_mixed=dict(type='bool', required=False, default=True),
+        statuscake_timeout=dict(type='int', required=False, default=True)
     )
 
     module = AnsibleModule(
@@ -296,6 +307,7 @@ def run_module():
     alert_reminder = module.params['alert_reminder']
     alert_broken = module.params['alert_broken']
     alert_mixed = module.params['alert_mixed']
+    statucake_timeout = module.params['statuscake_timeout']
 
     if not (username and api_key) and \
             os.environ.get('STATUSCAKE_USERNAME') and \
@@ -320,7 +332,8 @@ def run_module():
                          alert_expiry,
                          alert_reminder,
                          alert_broken,
-                         alert_mixed)
+                         alert_mixed,
+                         statuscake_timeout)
 
     if state == "absent":
         test.delete_test()

@@ -227,7 +227,7 @@ class StatusCakeUptime:
                  test_tags, check_rate, test_type, port, contact_group, paused,
                  node_locations, confirmation, timeout, status_codes, host,
                  custom_header, follow_redirect, find_string, do_not_find,
-                 post_raw, trigger_rate):
+                 post_raw, trigger_rate, statuscake_timeout):
 
         self.headers = {"Username": username, "API": api_key}
         self.module = module
@@ -250,6 +250,7 @@ class StatusCakeUptime:
         self.port = port
         self.post_raw = post_raw
         self.trigger_rate = trigger_rate
+        self.statuscake_timeout = statuscake_timeout
 
         if not check_rate:
             self.check_rate = 300
@@ -264,6 +265,11 @@ class StatusCakeUptime:
             self.trigger_rate = 5
         else:
             self.trigger_rate = trigger_rate
+
+        if not statuscake_timeout:
+            self.statuscake_timeout = 10
+        else:
+            self.statuscake_timeout = statuscake_timeout
 
         self.data = {"WebsiteName": self.name,
                      "WebsiteURL": self.url,
@@ -405,7 +411,7 @@ class StatusCakeUptime:
                                headers=self.headers,
                                data=payload,
                                method=self.method,
-                               timeout=20
+                               timeout=self.statuscake_timeout
                                )
 
         if info['status'] >= (500 or -1):
@@ -445,6 +451,7 @@ def run_module():
         do_not_find=dict(type='int', required=False),
         post_raw=dict(type='str', required=False),
         trigger_rate=dict(type='int', required=False),
+        statuscake_timeout=dict(type='int', required=False, default=True)
     )
 
     module = AnsibleModule(
@@ -479,6 +486,7 @@ def run_module():
     do_not_find = module.params['do_not_find']
     post_raw = module.params['post_raw']
     trigger_rate = module.params['trigger_rate']
+    statuscake_timeout = module.params['statuscake_timeout']
 
     if not (username and api_key) and \
             os.environ.get('STATUSCAKE_USERNAME') and \
@@ -514,7 +522,8 @@ def run_module():
                             find_string,
                             do_not_find,
                             post_raw,
-                            trigger_rate)
+                            trigger_rate,
+                            statuscake_timeout)
 
     if state == "absent":
         test.delete_test()
